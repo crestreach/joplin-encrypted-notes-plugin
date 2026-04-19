@@ -714,7 +714,7 @@ async function showPasswordDialog(message: string, confirmPassword: boolean, err
 		: field('password', 'Password', 'margin-bottom:0;');
 
 	const errorBanner = errorMsg
-		? `<p style="color:#dc2626;font-size:0.9em;margin-bottom:10px;padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;">${escapeHtml(errorMsg)}</p>`
+		? `<p style="color:#dc2626;font-size:0.85em;margin-bottom:10px;text-align:center;">${escapeHtml(errorMsg)}</p>`
 		: '';
 
 	const formHtml = `<div style="padding:16px;">
