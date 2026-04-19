@@ -93,4 +93,4 @@ The built plugin archive will be in `publish/`.
 
 ## License
 
-MIT
+BSD 2-Clause
