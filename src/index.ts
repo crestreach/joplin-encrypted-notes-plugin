@@ -53,6 +53,10 @@ let messageDialogHandle: string | null = null;
 // Tracks temp-note → original-note mapping (native editor mode)
 const tempNoteMap = new Map<string, { originalNoteId: string; password: string }>();
 
+// Protects encrypted note bodies from accidental corruption (e.g. Rich Text editor)
+const encryptedBodyCache = new Map<string, string>();
+let pluginModifying = false;
+
 // ---------------------------------------------------------------------------
 // Plugin registration
 // ---------------------------------------------------------------------------
@@ -216,13 +220,57 @@ joplin.plugins.register({
 		// --- Auto re-encrypt when user navigates away from a temp note ---
 		await joplin.workspace.onNoteSelectionChange(async () => {
 			await autoFinishTempNotes();
+
+			// Cache encrypted note bodies for corruption protection
+			const note = await getSelectedNote();
+			if (note && isEncryptedNote(note.body)) {
+				encryptedBodyCache.set(note.id, note.body);
+			}
 		});
+
+		// --- Protect encrypted notes from accidental edits (Rich Text editor) ---
+		try {
+			await joplin.workspace.onNoteContentChange(async () => {
+				if (pluginModifying) return;
+				const note = await getSelectedNote();
+				if (!note) return;
+
+				const cachedBody = encryptedBodyCache.get(note.id);
+				if (cachedBody && !isEncryptedNote(note.body)) {
+					// Body was corrupted — restore the encrypted version
+					pluginModifying = true;
+					try {
+						await joplin.data.put(['notes', note.id], null, { body: cachedBody });
+					} finally {
+						setTimeout(() => { pluginModifying = false; }, 500);
+					}
+				}
+			});
+		} catch {
+			// onNoteContentChange may not exist in older Joplin versions
+		}
 	},
 });
 
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
+
+/** Write a note body while bypassing the corruption-protection handler. */
+async function putNoteBody(noteId: string, body: string) {
+	pluginModifying = true;
+	try {
+		await joplin.data.put(['notes', noteId], null, { body });
+		// Update the cache so the protection handler knows the new state
+		if (isEncryptedNote(body)) {
+			encryptedBodyCache.set(noteId, body);
+		} else {
+			encryptedBodyCache.delete(noteId);
+		}
+	} finally {
+		setTimeout(() => { pluginModifying = false; }, 500);
+	}
+}
 
 async function updateSettings() {
 	const values = await joplin.settings.values([SETTINGS.KEY_SIZE, SETTINGS.AES_MODE, SETTINGS.EDITOR_MODE]);
@@ -275,7 +323,7 @@ async function encryptCurrentNote() {
 
 		const encrypted = await encryptData(note.body || '', password, aesOptions);
 		const encryptedBody = formatEncryptedNote(encrypted, aesOptions);
-		await joplin.data.put(['notes', note.id], null, { body: encryptedBody });
+		await putNoteBody(note.id, encryptedBody);
 		await showToast('Note encrypted successfully');
 		return;
 	}
@@ -307,7 +355,7 @@ async function decryptCurrentNote() {
 
 		try {
 			const decrypted = await decryptData(parsed.data, password, parsed.options);
-			await joplin.data.put(['notes', note.id], null, { body: decrypted });
+			await putNoteBody(note.id, decrypted);
 			await showToast('Note decrypted successfully');
 			return;
 		} catch (err) {
@@ -440,7 +488,7 @@ async function editViaCodeMirrorDialog(
 	try {
 		const encrypted = await encryptData(newContent, password, aesOptions);
 		const encryptedBody = formatEncryptedNote(encrypted, aesOptions);
-		await joplin.data.put(['notes', note.id], null, { body: encryptedBody });
+		await putNoteBody(note.id, encryptedBody);
 		return true;
 	} catch {
 		await showToast('Encryption failed. Please try again.');
@@ -546,7 +594,7 @@ async function finishTempNoteById(
 	try {
 		const encrypted = await encryptData(editedBody, password, aesOptions);
 		const encryptedBody = formatEncryptedNote(encrypted, aesOptions);
-		await joplin.data.put(['notes', originalNoteId], null, { body: encryptedBody });
+		await putNoteBody(originalNoteId, encryptedBody);
 	} catch {
 		console.error('[EncryptedNotes] Re-encryption failed for temp note', tempNoteId);
 		tempNoteMap.delete(tempNoteId);

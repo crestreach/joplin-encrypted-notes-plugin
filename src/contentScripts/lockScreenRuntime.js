@@ -7,6 +7,33 @@
  */
 
 // ---------------------------------------------------------------------------
+// Protect lock screen from editing in Rich Text (WYSIWYG) mode.
+// Joplin's HTML sanitizer may strip contenteditable from the HTML, so we
+// set it programmatically here and re-apply it with a MutationObserver.
+// ---------------------------------------------------------------------------
+
+(function protectFromEditing() {
+	var container = document.getElementById('encrypted-note-container');
+	if (!container) return;
+
+	function lockContainer() {
+		if (container.contentEditable !== 'false') {
+			container.contentEditable = 'false';
+		}
+	}
+	lockContainer();
+
+	// Re-apply if TinyMCE or anything else strips the attribute
+	try {
+		new MutationObserver(lockContainer)
+			.observe(container, { attributes: true, attributeFilter: ['contenteditable'] });
+	} catch (_) {}
+
+	// Periodic fallback in case MutationObserver doesn't catch it
+	setInterval(lockContainer, 1000);
+})();
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
