@@ -152,7 +152,7 @@ joplin.plugins.register({
 			label: 'Encrypt Note',
 			enabledCondition: 'oneNoteSelected',
 			iconName: 'fas fa-lock',
-			execute: encryptCurrentNote,
+			execute: async () => { try { await encryptCurrentNote(); } catch (e) { console.error('[EncryptedNotes] encrypt failed:', e); } },
 		});
 
 		await joplin.commands.register({
@@ -160,7 +160,7 @@ joplin.plugins.register({
 			label: 'Decrypt Note (Permanent)',
 			enabledCondition: 'oneNoteSelected',
 			iconName: 'fas fa-unlock',
-			execute: decryptCurrentNote,
+			execute: async () => { try { await decryptCurrentNote(); } catch (e) { console.error('[EncryptedNotes] decrypt failed:', e); } },
 		});
 
 		await joplin.commands.register({
@@ -168,7 +168,7 @@ joplin.plugins.register({
 			label: 'Edit Encrypted Note',
 			enabledCondition: 'oneNoteSelected',
 			iconName: 'fas fa-edit',
-			execute: () => editEncryptedNote(),
+			execute: async () => { try { await editEncryptedNote(); } catch (e) { console.error('[EncryptedNotes] edit failed:', e); } },
 		});
 
 		await joplin.commands.register({
@@ -176,7 +176,7 @@ joplin.plugins.register({
 			label: 'Finish Editing & Re-encrypt',
 			enabledCondition: 'oneNoteSelected',
 			iconName: 'fas fa-check-circle',
-			execute: finishTempNoteEdit,
+			execute: async () => { try { await finishTempNoteEdit(); } catch (e) { console.error('[EncryptedNotes] finishEdit failed:', e); } },
 		});
 
 		await joplin.commands.register({
@@ -184,7 +184,7 @@ joplin.plugins.register({
 			label: 'Toggle Note Encryption',
 			enabledCondition: 'oneNoteSelected',
 			iconName: 'fas fa-user-lock',
-			execute: toggleLock,
+			execute: async () => { try { await toggleLock(); } catch (e) { console.error('[EncryptedNotes] toggleLock failed:', e); } },
 		});
 
 		// --- Toolbar & Menu ---
@@ -540,6 +540,11 @@ async function editViaTempNote(
 		body: decrypted,
 	});
 
+	if (!tempNote || !tempNote.id) {
+		await showToast('Failed to create temporary note');
+		return;
+	}
+
 	// Store mapping in memory (password never written to disk)
 	tempNoteMap.set(tempNote.id, {
 		originalNoteId: note.id,
@@ -591,12 +596,21 @@ async function finishTempNoteById(
 		tempNoteMap.delete(tempNoteId);
 		return;
 	}
+	if (!tempNote || !tempNote.id) {
+		tempNoteMap.delete(tempNoteId);
+		return;
+	}
 
 	// Verify original note still exists
+	let origNote: any;
 	try {
-		await joplin.data.get(['notes', originalNoteId], { fields: ['id'] });
+		origNote = await joplin.data.get(['notes', originalNoteId], { fields: ['id'] });
 	} catch {
 		// Original gone — just clean up
+		tempNoteMap.delete(tempNoteId);
+		return;
+	}
+	if (!origNote || !origNote.id) {
 		tempNoteMap.delete(tempNoteId);
 		return;
 	}
@@ -646,9 +660,15 @@ async function finishTempNoteEdit() {
 // ---------------------------------------------------------------------------
 
 async function getSelectedNote() {
-	const noteIds = await joplin.workspace.selectedNoteIds();
-	if (!noteIds || noteIds.length === 0) return null;
-	return joplin.data.get(['notes', noteIds[0]], { fields: ['id', 'body', 'title'] });
+	try {
+		const noteIds = await joplin.workspace.selectedNoteIds();
+		if (!noteIds || noteIds.length === 0) return null;
+		const note = await joplin.data.get(['notes', noteIds[0]], { fields: ['id', 'body', 'title'] });
+		if (!note || !note.id) return null;
+		return note;
+	} catch {
+		return null;
+	}
 }
 
 
