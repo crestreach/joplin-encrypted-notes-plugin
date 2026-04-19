@@ -9,9 +9,6 @@ export default function (context: any) {
 
 	return {
 		plugin: function (markdownIt: any, _options: any) {
-			// Expose the MarkdownIt instance so lockScreenRuntime.js can render decrypted content
-			(globalThis as any).__encryptedNotes_md = markdownIt;
-
 			const defaultFence =
 				markdownIt.renderer.rules.fence ||
 				function (tokens: any, idx: number, options: any, env: any, self: any) {
@@ -58,28 +55,12 @@ function renderLockScreen(contentScriptId: string): string {
 		+ '    </svg>'
 		+ '  </div>'
 		+ '  <h2 class="lock-title">This note is encrypted</h2>'
-		+ '  <p class="lock-subtitle">Enter your password to unlock</p>'
-		+ '  <div id="unlock-form">'
-		+ '    <div class="password-field">'
-		+ '      <input type="password" id="unlock-password" placeholder="Password"'
-		+ '        autocomplete="off" />'
-		+ '      <button type="button" id="toggle-password-visibility" class="toggle-vis-btn"'
-		+ '        title="Show password">'
-		+ '        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"'
-		+ '          stroke="currentColor" stroke-width="2" stroke-linecap="round"'
-		+ '          stroke-linejoin="round">'
-		+ '          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>'
-		+ '          <circle cx="12" cy="12" r="3"></circle>'
-		+ '        </svg>'
-		+ '      </button>'
-		+ '    </div>'
-		+ '    <div id="unlock-error" class="error-message" style="display:none;"></div>'
-		+ '    <div class="lock-actions">'
-		+ '      <button type="button" id="unlock-btn" class="primary-btn">'
-		+ '        <span id="unlock-btn-text">Unlock</span>'
-		+ '        <span id="unlock-spinner" class="spinner" style="display:none;"></span>'
-		+ '      </button>'
-		+ '    </div>'
+		+ '  <p class="lock-subtitle">Click the button below to unlock</p>'
+		+ '  <div class="lock-actions">'
+		+ '    <button type="button" id="unlock-btn" class="primary-btn">'
+		+ '      <span id="unlock-btn-text">Unlock</span>'
+		+ '      <span id="unlock-spinner" class="spinner" style="display:none;"></span>'
+		+ '    </button>'
 		+ '  </div>'
 		+ '</div>'
 		+ '<div id="decrypted-view" class="encrypted-screen" style="display:none;">'

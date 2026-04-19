@@ -5,6 +5,9 @@ import {
 	MenuItemLocation,
 	ContentScriptType,
 } from 'api/types';
+import MarkdownIt = require('markdown-it');
+
+const md = new MarkdownIt({ breaks: true, linkify: true });
 import {
 	AesOptions,
 	DEFAULT_OPTIONS,
@@ -56,6 +59,9 @@ const tempNoteMap = new Map<string, { originalNoteId: string; password: string }
 // Protects encrypted note bodies from accidental corruption (e.g. Rich Text editor)
 const encryptedBodyCache = new Map<string, string>();
 let pluginModifying = false;
+
+// Auto-unlock after CodeMirror save (so the user doesn't have to re-enter password)
+const pendingAutoUnlock = new Map<string, string>(); // noteId → password
 
 // ---------------------------------------------------------------------------
 // Plugin registration
@@ -122,8 +128,22 @@ joplin.plugins.register({
 
 		// Handle messages from the lock screen content script
 		await joplin.contentScripts.onMessage(CONTENT_SCRIPT_ID, async (message: any) => {
+			if (message.type === 'init') {
+				// Check for pending auto-unlock (after CodeMirror save)
+				const note = await getSelectedNote();
+				if (note && pendingAutoUnlock.has(note.id)) {
+					const pw = pendingAutoUnlock.get(note.id)!;
+					pendingAutoUnlock.delete(note.id);
+					return handleSilentUnlock(pw);
+				}
+				return null;
+			}
 			if (message.type === 'unlock') {
-				return handleUnlock(message.password);
+				return handleUnlockViaDialog();
+			}
+			if (message.type === 'reUnlock') {
+				// Silent re-unlock with known password (after edit+save)
+				return handleSilentUnlock(message.password);
 			}
 			if (message.type === 'requestEdit') {
 				try {
@@ -373,7 +393,33 @@ async function decryptCurrentNote() {
 // Lock screen content script handlers
 // ---------------------------------------------------------------------------
 
-async function handleUnlock(password: string) {
+async function handleUnlockViaDialog() {
+	const note = await getSelectedNote();
+	if (!note) return { type: 'error', msg: 'No note selected' };
+
+	const parsed = parseEncryptedNote(note.body);
+	if (!parsed) return { type: 'error', msg: 'Invalid encrypted note format' };
+
+	let errorMsg = '';
+	while (true) {
+		const password = await showPasswordDialog('Enter password to unlock this note', false, errorMsg);
+		if (!password) return { type: 'cancelled' }; // user cancelled
+
+		try {
+			const decrypted = await decryptData(parsed.data, password, parsed.options);
+			const html = md.render(decrypted);
+			return { type: 'success', html, password };
+		} catch (err) {
+			if (err instanceof WrongPasswordError) {
+				errorMsg = 'Incorrect password. Please try again.';
+				continue;
+			}
+			return { type: 'error', msg: 'Decryption failed' };
+		}
+	}
+}
+
+async function handleSilentUnlock(password: string) {
 	const note = await getSelectedNote();
 	if (!note) return { type: 'error', msg: 'No note selected' };
 
@@ -382,11 +428,9 @@ async function handleUnlock(password: string) {
 
 	try {
 		const decrypted = await decryptData(parsed.data, password, parsed.options);
-		return { type: 'success', markdown: decrypted };
-	} catch (err) {
-		if (err instanceof WrongPasswordError) {
-			return { type: 'error', msg: 'Incorrect password, try again' };
-		}
+		const html = md.render(decrypted);
+		return { type: 'success', html, password };
+	} catch {
 		return { type: 'error', msg: 'Decryption failed' };
 	}
 }
@@ -488,9 +532,11 @@ async function editViaCodeMirrorDialog(
 	try {
 		const encrypted = await encryptData(newContent, password, aesOptions);
 		const encryptedBody = formatEncryptedNote(encrypted, aesOptions);
+		pendingAutoUnlock.set(note.id, password);
 		await putNoteBody(note.id, encryptedBody);
 		return true;
 	} catch {
+		pendingAutoUnlock.delete(note.id);
 		await showToast('Encryption failed. Please try again.');
 		return false;
 	}
@@ -500,7 +546,7 @@ async function editViaCodeMirrorDialog(
 // Editor mode: Native (temporary note)
 // ---------------------------------------------------------------------------
 
-const TEMP_NOTE_PREFIX = '[EDITING ENCRYPTED] ';
+const TEMP_NOTE_SUFFIX = ' [EDITING ENCRYPTED]';
 
 async function editViaTempNote(
 	note: any,
@@ -509,7 +555,7 @@ async function editViaTempNote(
 ) {
 	// Create a temporary note with the decrypted content
 	const tempNote = await joplin.data.post(['notes'], null, {
-		title: TEMP_NOTE_PREFIX + (note.title || 'Untitled'),
+		title: (note.title || 'Untitled') + TEMP_NOTE_SUFFIX,
 		body: decrypted,
 	});
 
