@@ -178,7 +178,23 @@ document.addEventListener('keydown', function (e) {
 	if (e.target.id === 'unlock-password' && e.key === 'Enter') {
 		e.preventDefault();
 		submitPassword();
+		return;
 	}
+	// Block all keyboard input outside the password field within our container
+	var container = document.getElementById('encrypted-note-container');
+	if (container && container.contains(e.target) && e.target.id !== 'unlock-password') {
+		if (!e.ctrlKey && !e.metaKey && e.key.length === 1) {
+			e.preventDefault();
+		}
+	}
+});
+
+// Prevent editing of lock screen content in Rich Text (WYSIWYG) mode
+document.addEventListener('beforeinput', function (e) {
+	var container = document.getElementById('encrypted-note-container');
+	if (!container || !container.contains(e.target)) return;
+	if (e.target.id === 'unlock-password') return;
+	e.preventDefault();
 });
 
 document.addEventListener('joplin-noteDidUpdate', function () { resetForm(); });

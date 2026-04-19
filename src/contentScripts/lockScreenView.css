@@ -2,6 +2,14 @@
 
 #encrypted-note-container {
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+	-webkit-user-modify: read-only;
+	user-select: none;
+}
+
+#encrypted-note-container input,
+#encrypted-note-container button {
+	-webkit-user-modify: read-write-plaintext-only;
+	user-select: auto;
 }
 
 .encrypted-screen {
