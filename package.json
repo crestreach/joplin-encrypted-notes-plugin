@@ -1,0 +1,39 @@
+{
+	"name": "joplin-plugin-encrypted-notes",
+	"version": "1.0.0",
+	"description": "Encrypt and decrypt notes with a password using AES-256-GCM. View and edit encrypted notes transparently while they remain encrypted on disk.",
+	"keywords": [
+		"joplin-plugin",
+		"encryption",
+		"security",
+		"privacy",
+		"encrypted-notes"
+	],
+	"scripts": {
+		"build:webview": "node scripts/build-webview.js",
+		"dist": "npm run build:webview && webpack --env joplin-plugin-config=buildMain && webpack --env joplin-plugin-config=buildExtraScripts && webpack --env joplin-plugin-config=createArchive",
+		"prepare": "npm run dist",
+		"update": "npm install -g generator-joplin && yo joplin --update"
+	},
+	"license": "MIT",
+	"devDependencies": {
+		"@codemirror/commands": "^6.10.3",
+		"@codemirror/lang-markdown": "^6.5.0",
+		"@codemirror/language": "^6.12.3",
+		"@codemirror/search": "^6.6.0",
+		"@codemirror/state": "^6.6.0",
+		"@codemirror/view": "^6.41.1",
+		"@lezer/highlight": "^1.2.3",
+		"@types/node": "^18.0.0",
+		"chalk": "^4.1.2",
+		"copy-webpack-plugin": "^11.0.0",
+		"esbuild": "^0.28.0",
+		"fs-extra": "^11.1.1",
+		"glob": "^10.3.3",
+		"tar": "^6.1.15",
+		"ts-loader": "^9.4.4",
+		"typescript": "^5.1.6",
+		"webpack": "^5.88.2",
+		"webpack-cli": "^5.1.4"
+	}
+}

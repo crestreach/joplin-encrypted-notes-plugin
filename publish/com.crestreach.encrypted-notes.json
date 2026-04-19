@@ -1,0 +1,21 @@
+{
+	"manifest_version": 1,
+	"id": "com.crestreach.encrypted-notes",
+	"app_min_version": "2.10",
+	"app_min_version_mobile": "3.0.3",
+	"platforms": [
+		"desktop",
+		"mobile"
+	],
+	"version": "1.0.0",
+	"name": "Encrypted Notes",
+	"description": "Encrypt and decrypt notes with a password using AES-256-GCM. View and edit encrypted notes transparently while they remain encrypted on disk.",
+	"author": "Artur",
+	"homepage_url": "https://github.com/arturolszak/joplin-encrypted-notes-plugin",
+	"categories": [
+		"productivity",
+		"personal knowledge management"
+	],
+	"_publish_hash": "sha256:26dd4766eacad1897549bafb944b1f8691a6d3d19d63fac1015625b8d8aaff2f",
+	"_publish_commit": ""
+}
