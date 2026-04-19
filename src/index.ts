@@ -144,6 +144,7 @@ joplin.plugins.register({
 		cmEditorDialogHandle = await joplin.views.dialogs.create(`${PLUGIN_ID}.cmEditorDialog`);
 		await joplin.views.dialogs.addScript(cmEditorDialogHandle, 'webview/cmEditorDialog.css');
 		await joplin.views.dialogs.addScript(cmEditorDialogHandle, 'webview/cmEditor.bundle.js');
+		await joplin.views.dialogs.addScript(cmEditorDialogHandle, 'webview/cmEditorRuntime.js');
 		await joplin.views.dialogs.setFitToContent(cmEditorDialogHandle, false);
 
 		// --- Commands ---
@@ -416,89 +417,13 @@ async function editViaCodeMirrorDialog(
 		<button class="tb-btn" data-action="hr" title="Horizontal rule"><svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12"/></svg></button>
 	</div>`;
 
-	// Inline script — runs fresh every time setHtml is called
-	const runtimeScript = `<script>
-(function() {
-	var cmView = null;
-	var container = document.getElementById('cm-container');
-	var hiddenField = document.getElementById('cm-hidden-content');
-	if (!container || !hiddenField) return;
-	var initial = hiddenField.value || '';
-
-	function tryInit() {
-		if (typeof window.initCodeMirror === 'function') {
-			cmView = window.initCodeMirror(container, initial, function(content) {
-				hiddenField.value = content;
-			});
-		} else {
-			setTimeout(tryInit, 50);
-		}
-	}
-	tryInit();
-
-	function getSelection() {
-		var s = cmView.state, sel = s.selection.main;
-		return { from: sel.from, to: sel.to, text: s.doc.sliceString(sel.from, sel.to) };
-	}
-	function wrapSel(before, after, ph) {
-		var sel = getSelection(), text = sel.text || ph;
-		cmView.dispatch({
-			changes: { from: sel.from, to: sel.to, insert: before + text + after },
-			selection: { anchor: sel.from + before.length, head: sel.from + before.length + text.length }
-		});
-	}
-	function prependLine(prefix) {
-		var s = cmView.state, sel = s.selection.main, line = s.doc.lineAt(sel.from);
-		cmView.dispatch({
-			changes: { from: line.from, to: line.from, insert: prefix },
-			selection: { anchor: sel.from + prefix.length }
-		});
-	}
-	function insertAt(text) {
-		var sel = getSelection();
-		cmView.dispatch({
-			changes: { from: sel.from, to: sel.to, insert: text },
-			selection: { anchor: sel.from + text.length }
-		});
-	}
-	document.addEventListener('click', function(e) {
-		var btn = e.target.closest('.tb-btn');
-		if (!btn || !cmView) return;
-		e.preventDefault();
-		var a = btn.getAttribute('data-action');
-		cmView.focus();
-		if (a === 'bold') wrapSel('**','**','bold');
-		else if (a === 'italic') wrapSel('*','*','italic');
-		else if (a === 'strikethrough') wrapSel('~~','~~','text');
-		else if (a === 'code') wrapSel('\\x60','\\x60','code');
-		else if (a === 'codeblock') wrapSel('\\n\\x60\\x60\\x60\\n','\\n\\x60\\x60\\x60\\n','code');
-		else if (a === 'heading') prependLine('# ');
-		else if (a === 'ul') prependLine('- ');
-		else if (a === 'ol') prependLine('1. ');
-		else if (a === 'checkbox') prependLine('- [ ] ');
-		else if (a === 'quote') prependLine('> ');
-		else if (a === 'hr') insertAt('\\n---\\n');
-		else if (a === 'link') {
-			var sel = getSelection(), text = sel.text || 'text';
-			var rep = '[' + text + '](url)';
-			var us = sel.from + 1 + text.length + 2;
-			cmView.dispatch({
-				changes: { from: sel.from, to: sel.to, insert: rep },
-				selection: { anchor: us, head: us + 3 }
-			});
-		}
-	});
-})();
-<\/script>`;
-
 	const editorHtml = `<div id="cm-editor-root">
 		${toolbarHtml}
 		<div id="cm-container"></div>
 		<form name="editorForm">
 			<textarea id="cm-hidden-content" name="content">${escapeHtml(decrypted)}</textarea>
 		</form>
-	</div>
-	${runtimeScript}`;
+	</div>`;
 
 	await joplin.views.dialogs.setHtml(cmEditorDialogHandle, editorHtml);
 	await joplin.views.dialogs.setButtons(cmEditorDialogHandle, [

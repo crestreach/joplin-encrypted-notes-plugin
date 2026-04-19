@@ -47,7 +47,7 @@ export default function (context: any) {
 
 function renderLockScreen(contentScriptId: string): string {
 	const nonce = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-	return '<div id="encrypted-note-container" data-nonce="' + nonce + '">'
+	return '<div id="encrypted-note-container" contenteditable="false" data-nonce="' + nonce + '">'
 		+ '<div id="encrypted-note-csid" class="encrypted-note-meta">' + contentScriptId + '</div>'
 		+ '<div id="lock-screen" class="encrypted-screen">'
 		+ '  <div class="lock-icon">'

@@ -12,12 +12,18 @@
 	var initial = hiddenField.value || '';
 
 	// Initialize CodeMirror (function exposed by cmEditor.bundle.js)
-	if (typeof window.initCodeMirror === 'function') {
-		cmView = window.initCodeMirror(container, initial, function (content) {
-			// Keep hidden textarea in sync so formData picks it up
-			hiddenField.value = content;
-		});
+	// Use polling because the bundle script may load after this script
+	function tryInit() {
+		if (typeof window.initCodeMirror === 'function') {
+			cmView = window.initCodeMirror(container, initial, function (content) {
+				// Keep hidden textarea in sync so formData picks it up
+				hiddenField.value = content;
+			});
+		} else {
+			setTimeout(tryInit, 50);
+		}
 	}
+	tryInit();
 
 	// Toolbar button actions
 	document.addEventListener('click', function (e) {

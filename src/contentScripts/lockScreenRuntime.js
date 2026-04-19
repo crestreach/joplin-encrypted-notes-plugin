@@ -51,7 +51,15 @@ function showDecryptedView(markdown) {
 	if (view) view.style.display = 'block';
 	if (body) {
 		var md = window.__encryptedNotes_md;
-		body.innerHTML = (md && markdown) ? md.render(markdown) : (markdown || '');
+		if (md && markdown) {
+			// Ensure single newlines render as <br> to match Joplin's viewer
+			var prevBreaks = md.options.breaks;
+			md.set({ breaks: true });
+			body.innerHTML = md.render(markdown);
+			md.set({ breaks: prevBreaks });
+		} else {
+			body.innerHTML = (markdown || '').replace(/\n/g, '<br>');
+		}
 	}
 }
 
