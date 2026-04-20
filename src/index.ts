@@ -59,9 +59,15 @@ const tempNoteMap = new Map<string, { originalNoteId: string; password: string }
 // Protects encrypted note bodies from accidental corruption (e.g. Rich Text editor)
 const encryptedBodyCache = new Map<string, string>();
 let pluginModifying = false;
+let lastSelectedNoteId: string | null = null;
 
-// Auto-unlock after CodeMirror save (so the user doesn't have to re-enter password)
-const pendingAutoUnlock = new Map<string, string>(); // noteId → password
+// Tracks unlocked notes so re-renders don't show the lock screen again.
+// Cleared when the user relocks or navigates away.
+const unlockedNotes = new Map<string, string>(); // noteId → password
+
+// Force markdown (code view) mode on encrypted notes
+let forcedCodeView = false;
+let codeViewGuardInterval: ReturnType<typeof setInterval> | null = null;
 
 // ---------------------------------------------------------------------------
 // Plugin registration
@@ -129,21 +135,25 @@ joplin.plugins.register({
 		// Handle messages from the lock screen content script
 		await joplin.contentScripts.onMessage(CONTENT_SCRIPT_ID, async (message: any) => {
 			if (message.type === 'init') {
-				// Check for pending auto-unlock (after CodeMirror save)
+				// If this note is already unlocked, silently re-show decrypted content
 				const note = await getSelectedNote();
-				if (note && pendingAutoUnlock.has(note.id)) {
-					const pw = pendingAutoUnlock.get(note.id)!;
-					pendingAutoUnlock.delete(note.id);
-					return handleSilentUnlock(pw);
+				if (note && unlockedNotes.has(note.id)) {
+					return handleSilentUnlock(unlockedNotes.get(note.id)!);
 				}
 				return null;
 			}
 			if (message.type === 'unlock') {
-				return handleUnlockViaDialog();
+				const result = await handleUnlockViaDialog();
+				if (result.type === 'success') {
+					const note = await getSelectedNote();
+					if (note) unlockedNotes.set(note.id, result.password);
+				}
+				return result;
 			}
-			if (message.type === 'reUnlock') {
-				// Silent re-unlock with known password (after edit+save)
-				return handleSilentUnlock(message.password);
+			if (message.type === 'relock') {
+				const note = await getSelectedNote();
+				if (note) unlockedNotes.delete(note.id);
+				return null;
 			}
 			if (message.type === 'requestEdit') {
 				try {
@@ -239,12 +249,33 @@ joplin.plugins.register({
 
 		// --- Auto re-encrypt when user navigates away from a temp note ---
 		await joplin.workspace.onNoteSelectionChange(async () => {
+			// Before anything else, verify the note we just LEFT wasn't corrupted
+			await revertIfCorrupted(lastSelectedNoteId);
+
+			// Stop the code-view guard from the previous note
+			stopCodeViewGuard();
+
+			// If we forced code view on the previous note, restore Rich Text
+			if (forcedCodeView) {
+				forcedCodeView = false;
+				try {
+					await joplin.commands.execute('toggleEditors');
+				} catch { /* best effort */ }
+			}
+
+			// Clear unlock state for the note we're leaving
+			if (lastSelectedNoteId) unlockedNotes.delete(lastSelectedNoteId);
+
 			await autoFinishTempNotes();
 
 			// Cache encrypted note bodies for corruption protection
 			const note = await getSelectedNote();
-			if (note && isEncryptedNote(note.body)) {
-				encryptedBodyCache.set(note.id, note.body);
+			if (note) {
+				lastSelectedNoteId = note.id;
+				if (isEncryptedNote(note.body)) {
+					encryptedBodyCache.set(note.id, note.body);
+					await ensureCodeView();
+				}
 			}
 		});
 
@@ -289,6 +320,66 @@ async function putNoteBody(noteId: string, body: string) {
 		}
 	} finally {
 		setTimeout(() => { pluginModifying = false; }, 500);
+	}
+}
+
+/**
+ * Check if a previously-selected encrypted note was corrupted (e.g. by Rich
+ * Text edits that slipped through before the content-change handler fired).
+ * If so, restore the cached encrypted body.
+ */
+async function revertIfCorrupted(noteId: string | null) {
+	if (!noteId) return;
+	const cachedBody = encryptedBodyCache.get(noteId);
+	if (!cachedBody) return;
+
+	try {
+		const note = await joplin.data.get(['notes', noteId], { fields: ['body'] });
+		if (!note) return;
+		if (note.body !== cachedBody && !isEncryptedNote(note.body)) {
+			pluginModifying = true;
+			try {
+				await joplin.data.put(['notes', noteId], null, { body: cachedBody });
+			} finally {
+				setTimeout(() => { pluginModifying = false; }, 500);
+			}
+		}
+	} catch {
+		// Note may have been deleted
+	}
+}
+
+/**
+ * Force the editor into markdown/code-view mode for encrypted notes.
+ * If the user is in Rich Text mode, toggle to code view and start
+ * a 500ms guard interval that re-forces it if something switches back.
+ */
+async function ensureCodeView() {
+	try {
+		const isCodeView = await joplin.settings.globalValue('editor.codeView');
+		if (!isCodeView) {
+			await joplin.commands.execute('toggleEditors');
+			forcedCodeView = true;
+		}
+	} catch { /* globalValue may not exist on mobile */ }
+
+	// Safety interval: re-check every 500ms while on this encrypted note
+	stopCodeViewGuard();
+	codeViewGuardInterval = setInterval(async () => {
+		try {
+			const isCodeView = await joplin.settings.globalValue('editor.codeView');
+			if (!isCodeView) {
+				await joplin.commands.execute('toggleEditors');
+				forcedCodeView = true;
+			}
+		} catch { /* ignore */ }
+	}, 500);
+}
+
+function stopCodeViewGuard() {
+	if (codeViewGuardInterval !== null) {
+		clearInterval(codeViewGuardInterval);
+		codeViewGuardInterval = null;
 	}
 }
 
@@ -532,11 +623,11 @@ async function editViaCodeMirrorDialog(
 	try {
 		const encrypted = await encryptData(newContent, password, aesOptions);
 		const encryptedBody = formatEncryptedNote(encrypted, aesOptions);
-		pendingAutoUnlock.set(note.id, password);
+		unlockedNotes.set(note.id, password);
 		await putNoteBody(note.id, encryptedBody);
 		return true;
 	} catch {
-		pendingAutoUnlock.delete(note.id);
+		unlockedNotes.delete(note.id);
 		await showToast('Encryption failed. Please try again.');
 		return false;
 	}

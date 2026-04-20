@@ -46,7 +46,7 @@ function renderLockScreen(contentScriptId: string): string {
 	const nonce = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 	return '<div id="encrypted-note-container" contenteditable="false" data-nonce="' + nonce + '">'
 		+ '<div id="encrypted-note-csid" class="encrypted-note-meta">' + contentScriptId + '</div>'
-		+ '<div id="lock-screen" class="encrypted-screen">'
+		+ '<div id="lock-screen" class="encrypted-screen" style="display:none;">'
 		+ '  <div class="lock-icon">'
 		+ '    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
 		+ '      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'

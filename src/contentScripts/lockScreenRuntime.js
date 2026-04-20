@@ -43,12 +43,14 @@ function readCsId() {
 // ---------------------------------------------------------------------------
 
 var _storedPassword = null;
+var _cachedDecryptedHtml = null;
 
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
 
 function showDecryptedView(html) {
+	_cachedDecryptedHtml = html;
 	document.getElementById('lock-screen').style.display = 'none';
 	var view = document.getElementById('decrypted-view');
 	var body = document.getElementById('decrypted-content');
@@ -90,13 +92,22 @@ async function requestUnlock() {
 async function openEditor() {
 	var csId = readCsId();
 	if (!csId) return;
-	await webviewApi.postMessage(csId, { type: 'requestEdit', password: _storedPassword });
-	// After CM save, putNoteBody triggers a re-render.
-	// joplin-noteDidUpdate will fire and auto-unlock via the init message.
+	var res = await webviewApi.postMessage(csId, { type: 'requestEdit', password: _storedPassword });
+	// After CM save, refresh the decrypted view explicitly
+	// (mobile may not fire joplin-noteDidUpdate reliably)
+	if (res && res.type === 'saved') {
+		checkAutoUnlock();
+	}
 }
 
 async function relock() {
 	_storedPassword = null;
+	_cachedDecryptedHtml = null;
+
+	var csId = readCsId();
+	if (csId) {
+		await webviewApi.postMessage(csId, { type: 'relock' });
+	}
 
 	var lock = document.getElementById('lock-screen');
 	var view = document.getElementById('decrypted-view');
@@ -146,11 +157,22 @@ async function checkAutoUnlock() {
 		if (res && res.type === 'success') {
 			_storedPassword = res.password || null;
 			showDecryptedView(res.html);
+			return;
 		}
 	} catch (_) {}
+	// Not unlocked — clear cache and show the lock screen
+	_cachedDecryptedHtml = null;
+	var lock = document.getElementById('lock-screen');
+	if (lock) lock.style.display = 'flex';
 }
 
-document.addEventListener('joplin-noteDidUpdate', function () { checkAutoUnlock(); });
+document.addEventListener('joplin-noteDidUpdate', function () {
+	// Immediately restore cached view to prevent blink during DOM re-render
+	if (_cachedDecryptedHtml) {
+		showDecryptedView(_cachedDecryptedHtml);
+	}
+	checkAutoUnlock();
+});
 
 // Also check on initial script load
 checkAutoUnlock();
