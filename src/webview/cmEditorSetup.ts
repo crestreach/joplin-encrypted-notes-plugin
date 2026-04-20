@@ -3,7 +3,7 @@
  * Bundled into a single IIFE by esbuild → cmEditor.bundle.js
  */
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, highlightActiveLine, drawSelection, rectangularSelection, dropCursor } from '@codemirror/view';
+import { EditorView, keymap, highlightActiveLine, drawSelection, dropCursor } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldKeymap, HighlightStyle } from '@codemirror/language';
@@ -16,15 +16,27 @@ import { tags } from '@lezer/highlight';
 const joplinTheme = EditorView.theme({
 	'&': {
 		height: '100%',
-		fontSize: 'var(--joplin-font-size, 14px)',
+		fontSize: '16px',
+		outline: 'none !important',
+	},
+	'&.cm-focused': {
+		outline: 'none !important',
 	},
 	'.cm-content': {
 		fontFamily: 'var(--joplin-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
-		padding: '12px 16px',
-		caretColor: 'var(--joplin-color, #333)',
+		padding: '12px 0 6px 0',
+		caretColor: 'var(--joplin-color4, #4a9fd5)',
+		webkitUserModify: 'read-write-plaintext-only',
 	},
 	'.cm-cursor, .cm-dropCursor': {
-		borderLeftColor: 'var(--joplin-color, #333)',
+		borderLeftColor: 'var(--joplin-color4, #4a9fd5)',
+		borderLeftWidth: '2px',
+		marginLeft: '0',
+		pointerEvents: 'none',
+	},
+	'.cm-cursorLayer': {
+		pointerEvents: 'none',
+		zIndex: '100',
 	},
 	'&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
 		backgroundColor: 'var(--joplin-selected-color, rgba(74, 159, 213, 0.3))',
@@ -53,6 +65,16 @@ const joplinTheme = EditorView.theme({
 	'.cm-tooltip': {
 		backgroundColor: 'var(--joplin-background-color, #fff)',
 		border: '1px solid var(--joplin-divider-color, #ddd)',
+	},
+});
+
+// Override CM6 base theme to remove the focus outline
+const noOutlineBase = EditorView.baseTheme({
+	'&.cm-editor': {
+		outline: 'none !important',
+	},
+	'&.cm-editor.cm-focused': {
+		outline: 'none !important',
 	},
 });
 
@@ -88,10 +110,10 @@ const markdownHighlight = HighlightStyle.define([
 			dropCursor(),
 			indentOnInput(),
 			bracketMatching(),
-			rectangularSelection(),
 			highlightActiveLine(),
 			highlightSelectionMatches(),
 			joplinTheme,
+			noOutlineBase,
 			syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
 			syntaxHighlighting(markdownHighlight),
 			markdown(),

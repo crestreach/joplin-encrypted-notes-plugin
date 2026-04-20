@@ -10,7 +10,7 @@ esbuild.buildSync({
 	bundle: true,
 	format: 'iife',
 	target: ['es2020'],
-	outfile: path.resolve(__dirname, '../src/webview/cmEditor.bundle.js'),
+	outfile: path.resolve(__dirname, '../src/contentScripts/cmEditor.bundle.js'),
 	minify: true,
 	sourcemap: false,
 });

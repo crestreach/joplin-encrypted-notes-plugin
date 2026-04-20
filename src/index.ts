@@ -156,12 +156,56 @@ joplin.plugins.register({
 				return null;
 			}
 			if (message.type === 'requestEdit') {
-				try {
-					const saved = await editEncryptedNote(message.password || undefined);
-					return { type: saved ? 'saved' : 'cancelled' };
-				} catch (e) {
-					console.error('[EncryptedNotes] editEncryptedNote failed:', e);
+				const note = await getSelectedNote();
+				if (!note || !isEncryptedNote(note.body)) return { type: 'error' };
+				const parsed = parseEncryptedNote(note.body);
+				if (!parsed) return { type: 'error' };
+
+				let password = message.password as string | null;
+				let decrypted: string | null = null;
+				let errorMsg = '';
+
+				while (true) {
+					if (!password) {
+						password = await showPasswordDialog('Enter password to edit this note', false, errorMsg);
+						if (!password) return { type: 'cancelled' };
+					}
+					try {
+						decrypted = await decryptData(parsed.data, password, parsed.options);
+						break;
+					} catch (err) {
+						if (err instanceof WrongPasswordError) {
+							errorMsg = 'Incorrect password. Please try again.';
+							password = null;
+							continue;
+						}
+						return { type: 'error', msg: 'Decryption failed' };
+					}
+				}
+
+				if (editorMode === 'native') {
+					await editViaTempNote(note, decrypted!, password!);
+					return { type: 'nativeEdit' };
+				}
+
+				unlockedNotes.set(note.id, password!);
+				return { type: 'editContent', content: decrypted, password };
+			}
+			if (message.type === 'saveEdit') {
+				const note = await getSelectedNote();
+				if (!note || !message.password || message.content == null) {
 					return { type: 'error' };
+				}
+				try {
+					const encrypted = await encryptData(message.content, message.password, aesOptions);
+					const encryptedBody = formatEncryptedNote(encrypted, aesOptions);
+					unlockedNotes.set(note.id, message.password);
+					await putNoteBody(note.id, encryptedBody);
+					const html = md.render(message.content);
+					return { type: 'saved', html, password: message.password };
+				} catch (e) {
+					console.error('[EncryptedNotes] saveEdit failed:', e);
+					return { type: 'error', msg: 'Save failed' };
 				}
 			}
 			return null;
@@ -177,7 +221,7 @@ joplin.plugins.register({
 		// CodeMirror editor dialog
 		cmEditorDialogHandle = await joplin.views.dialogs.create(`${PLUGIN_ID}.cmEditorDialog`);
 		await joplin.views.dialogs.addScript(cmEditorDialogHandle, 'webview/cmEditorDialog.css');
-		await joplin.views.dialogs.addScript(cmEditorDialogHandle, 'webview/cmEditor.bundle.js');
+		await joplin.views.dialogs.addScript(cmEditorDialogHandle, 'contentScripts/cmEditor.bundle.js');
 		await joplin.views.dialogs.addScript(cmEditorDialogHandle, 'webview/cmEditorRuntime.js');
 		await joplin.views.dialogs.setFitToContent(cmEditorDialogHandle, false);
 

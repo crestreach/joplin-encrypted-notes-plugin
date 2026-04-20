@@ -35,6 +35,7 @@ export default function (context: any) {
 
 		assets: function () {
 			return [
+				{ name: 'cmEditor.bundle.js' },
 				{ name: 'lockScreenRuntime.js' },
 				{ name: 'lockScreenView.css' },
 			];
@@ -94,6 +95,33 @@ function renderLockScreen(contentScriptId: string): string {
 		+ '    </button>'
 		+ '  </div>'
 		+ '  <div id="decrypted-content" class="decrypted-content"></div>'
+		+ '</div>'
+		+ '<div id="editor-view" class="encrypted-screen" style="display:none;">'
+		+ '  <div class="editor-action-bar">'
+		+ '    <button id="editor-cancel-btn" class="toolbar-btn">Cancel</button>'
+		+ '    <span class="editor-label">Editing</span>'
+		+ '    <button id="editor-save-btn" class="primary-btn editor-save-btn">'
+		+ '      <span id="editor-save-text">Save</span>'
+		+ '      <span id="editor-save-spinner" class="spinner" style="display:none;"></span>'
+		+ '    </button>'
+		+ '  </div>'
+		+ '  <div class="editor-formatting">'
+		+ '    <button class="tf-btn" data-action="bold" title="Bold"><b>B</b></button>'
+		+ '    <button class="tf-btn" data-action="italic" title="Italic"><i>I</i></button>'
+		+ '    <button class="tf-btn" data-action="strikethrough" title="Strikethrough"><s>S</s></button>'
+		+ '    <span class="tf-sep"></span>'
+		+ '    <button class="tf-btn" data-action="heading" title="Heading">H</button>'
+		+ '    <button class="tf-btn" data-action="ul" title="Bullet list">&bull;</button>'
+		+ '    <button class="tf-btn" data-action="ol" title="Numbered list">1.</button>'
+		+ '    <button class="tf-btn" data-action="checkbox" title="Checkbox">&#9745;</button>'
+		+ '    <span class="tf-sep"></span>'
+		+ '    <button class="tf-btn" data-action="code" title="Inline code">&lt;/&gt;</button>'
+		+ '    <button class="tf-btn" data-action="codeblock" title="Code block">```</button>'
+		+ '    <button class="tf-btn" data-action="quote" title="Quote">&ldquo;</button>'
+		+ '    <button class="tf-btn" data-action="link" title="Link">&#128279;</button>'
+		+ '    <button class="tf-btn" data-action="hr" title="Horizontal rule">&mdash;</button>'
+		+ '  </div>'
+		+ '  <div id="cm-editor-container"></div>'
 		+ '</div>'
 		+ '</div>';
 }

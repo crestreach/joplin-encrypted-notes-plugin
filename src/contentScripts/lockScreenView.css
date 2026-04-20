@@ -167,8 +167,8 @@
 	gap: 4px;
 	font-size: 0.8em;
 	font-weight: 500;
-	color: #059669;
-	background: #ecfdf5;
+	color: #10b981;
+	background: rgba(16, 185, 129, 0.15);
 	padding: 3px 10px;
 	border-radius: 12px;
 	margin-right: auto;
@@ -201,10 +201,94 @@
 	max-width: 100%;
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-	.decrypted-badge {
-		background: #064e3b;
-		color: #6ee7b7;
-	}
+/* ---- Embedded Editor ---- */
+
+.editor-action-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 4px;
+	border-bottom: 1px solid var(--joplin-divider-color, #e5e7eb);
+}
+
+.editor-label {
+	font-size: 0.9em;
+	font-weight: 600;
+	color: var(--joplin-color, #374151);
+}
+
+.editor-save-btn {
+	padding: 6px 20px;
+	font-size: 14px;
+}
+
+.editor-formatting {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 4px 8px;
+	border-bottom: 1px solid var(--joplin-divider-color, #e5e7eb);
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	flex-wrap: nowrap;
+}
+
+.tf-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 32px;
+	height: 32px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--joplin-color, #374151);
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 600;
+	padding: 0 6px;
+	flex-shrink: 0;
+}
+
+.tf-btn:active {
+	background: rgba(128,128,128,0.2);
+}
+
+.tf-sep {
+	width: 1px;
+	height: 20px;
+	background: var(--joplin-divider-color, #d1d5db);
+	margin: 0 3px;
+	flex-shrink: 0;
+}
+
+#cm-editor-container {
+	width: 100%;
+	min-height: 200px;
+}
+
+#cm-editor-container .cm-editor {
+	height: auto !important;
+	min-height: 200px;
+}
+
+#cm-editor-container .cm-content {
+	min-height: 180px;
+	-webkit-user-modify: read-write-plaintext-only !important;
+}
+
+#cm-editor-container .cm-cursorLayer {
+	position: absolute !important;
+	z-index: 100 !important;
+	pointer-events: none !important;
+}
+
+#cm-editor-container .cm-cursor {
+	position: absolute !important;
+	border-left: 2px solid var(--joplin-color4, #4a9fd5) !important;
+	display: block !important;
+}
+
+#cm-editor-container .cm-scroller {
+	overflow: visible !important;
 }
