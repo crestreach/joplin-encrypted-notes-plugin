@@ -106,7 +106,7 @@ function renderLockScreen(contentScriptId: string): string {
 		+ '    </button>'
 		+ '  </div>'
 		+ '  <div class="editor-formatting">'
-		+ '    <button id="plaintext-toggle-btn" class="tf-btn" data-action="plaintext-toggle" title="Toggle Plaintext / Markdown">Aa</button>'
+  + '    <button id="plaintext-toggle-btn" class="tf-btn" data-action="plaintext-toggle" title="Toggle Plaintext / Markdown"><s>T</s></button>'
 		+ '    <span class="tf-sep"></span>'
 		+ '    <button class="tf-btn tf-md-btn" data-action="bold" title="Bold"><b>B</b></button>'
 		+ '    <button class="tf-btn tf-md-btn" data-action="italic" title="Italic"><i>I</i></button>'
