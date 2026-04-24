@@ -254,6 +254,12 @@
 	background: rgba(128,128,128,0.2);
 }
 
+.tf-btn-active {
+	background: var(--joplin-color4, #4a9fd5) !important;
+	color: #fff !important;
+	border-radius: 4px;
+}
+
 .tf-sep {
 	width: 1px;
 	height: 20px;
@@ -291,4 +297,38 @@
 
 #cm-editor-container .cm-scroller {
 	overflow: visible !important;
+}
+
+/* Plaintext content — no markdown/code formatting */
+.plaintext-content {
+	font-family: inherit;
+	font-size: inherit;
+	line-height: inherit;
+	color: inherit;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	background: none;
+	border: none;
+	padding: 0;
+	margin: 0;
+}
+
+.plaintext-content code,
+.plaintext-content pre,
+.plaintext-content a,
+.plaintext-content strong,
+.plaintext-content em,
+.plaintext-content h1,
+.plaintext-content h2,
+.plaintext-content h3,
+.plaintext-content h4,
+.plaintext-content h5,
+.plaintext-content h6 {
+	all: unset;
+	display: inline;
+	font: inherit;
+	color: inherit;
+	background: none;
+	border: none;
+	text-decoration: none;
 }

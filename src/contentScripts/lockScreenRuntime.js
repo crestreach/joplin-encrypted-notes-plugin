@@ -45,6 +45,7 @@ function readCsId() {
 var _storedPassword = null;
 var _cachedDecryptedHtml = null;
 var cmView = null;
+var _plaintextMode = false;
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -114,23 +115,36 @@ function showEditorView(content) {
 	var editorView = document.getElementById('editor-view');
 	var container = document.getElementById('cm-editor-container');
 	if (editorView) editorView.style.display = 'block';
+
+	// Detect plaintext wrapper and strip it for editing
+	var rawContent = content || '';
+	var isPlain = /^\s*```plaintext\s*[\r\n]/.test(rawContent);
+	if (isPlain) {
+		rawContent = rawContent.replace(/^\s*```plaintext\s*[\r\n]/, '');
+		rawContent = rawContent.replace(/\r?\n```\s*$/, '');
+	}
+	_plaintextMode = isPlain;
+	updatePlaintextUI();
+
 	if (container) {
 		if (cmView) { cmView.destroy(); cmView = null; }
 		container.innerHTML = '';
-		initCmEditor(container, content || '');
+		initCmEditor(container, rawContent);
 	}
 }
 
 function initCmEditor(container, content) {
-	if (typeof window.initCodeMirror === 'function') {
-		cmView = window.initCodeMirror(container, content);
+	var initFn = _plaintextMode ? window.initCodeMirrorPlain : window.initCodeMirror;
+	if (typeof initFn === 'function') {
+		cmView = initFn(container, content);
 		cmView.focus();
 	} else {
 		var attempts = 0;
 		var poll = setInterval(function() {
-			if (typeof window.initCodeMirror === 'function') {
+			initFn = _plaintextMode ? window.initCodeMirrorPlain : window.initCodeMirror;
+			if (typeof initFn === 'function') {
 				clearInterval(poll);
-				cmView = window.initCodeMirror(container, content);
+				cmView = initFn(container, content);
 				cmView.focus();
 			} else if (++attempts > 100) {
 				clearInterval(poll);
@@ -150,6 +164,10 @@ function hideEditorView() {
 async function saveFromEditor() {
 	if (!cmView) return;
 	var content = cmView.state.doc.toString();
+	// Re-wrap in ```plaintext fence if plaintext mode is active
+	if (_plaintextMode) {
+		content = '```plaintext\n' + content + '\n```';
+	}
 	var csId = readCsId();
 	if (!csId) return;
 
@@ -256,6 +274,42 @@ function cmInsertText(text) {
 	});
 }
 
+// ---------------------------------------------------------------------------
+// Plaintext mode toggle
+// ---------------------------------------------------------------------------
+
+function updatePlaintextUI() {
+	var toggleBtn = document.getElementById('plaintext-toggle-btn');
+	if (toggleBtn) {
+		if (_plaintextMode) {
+			toggleBtn.classList.add('tf-btn-active');
+		} else {
+			toggleBtn.classList.remove('tf-btn-active');
+		}
+	}
+	// Hide/show markdown formatting buttons
+	var mdBtns = document.querySelectorAll('.tf-md-btn');
+	for (var i = 0; i < mdBtns.length; i++) {
+		mdBtns[i].style.display = _plaintextMode ? 'none' : '';
+	}
+}
+
+function togglePlaintextMode() {
+	if (!cmView) return;
+	// Grab current content from the editor
+	var content = cmView.state.doc.toString();
+	_plaintextMode = !_plaintextMode;
+	updatePlaintextUI();
+	// Recreate the CM editor with or without markdown extensions
+	var container = document.getElementById('cm-editor-container');
+	if (container) {
+		cmView.destroy();
+		cmView = null;
+		container.innerHTML = '';
+		initCmEditor(container, content);
+	}
+}
+
 async function relock() {
 	_storedPassword = null;
 	_cachedDecryptedHtml = null;
@@ -286,7 +340,15 @@ document.addEventListener('click', function (e) {
 	if (el.closest('#editor-save-btn'))  { e.preventDefault(); saveFromEditor(); return; }
 	if (el.closest('#editor-cancel-btn')){ e.preventDefault(); cancelEditor(); return; }
 	var tfBtn = el.closest('.tf-btn');
-	if (tfBtn) { e.preventDefault(); handleToolbarAction(tfBtn); return; }
+	if (tfBtn) {
+		e.preventDefault();
+		if (tfBtn.getAttribute('data-action') === 'plaintext-toggle') {
+			togglePlaintextMode();
+			return;
+		}
+		if (!_plaintextMode) handleToolbarAction(tfBtn);
+		return;
+	}
 });
 
 // Block keyboard editing within our container (Rich Text mode protection)

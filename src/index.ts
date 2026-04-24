@@ -201,7 +201,7 @@ joplin.plugins.register({
 					const encryptedBody = formatEncryptedNote(encrypted, aesOptions);
 					unlockedNotes.set(note.id, message.password);
 					await putNoteBody(note.id, encryptedBody);
-					const html = md.render(message.content);
+					const html = renderDecryptedContent(message.content);
 					return { type: 'saved', html, password: message.password };
 				} catch (e) {
 					console.error('[EncryptedNotes] saveEdit failed:', e);
@@ -542,7 +542,7 @@ async function handleUnlockViaDialog() {
 
 		try {
 			const decrypted = await decryptData(parsed.data, password, parsed.options);
-			const html = md.render(decrypted);
+			const html = renderDecryptedContent(decrypted);
 			return { type: 'success', html, password };
 		} catch (err) {
 			if (err instanceof WrongPasswordError) {
@@ -563,7 +563,7 @@ async function handleSilentUnlock(password: string) {
 
 	try {
 		const decrypted = await decryptData(parsed.data, password, parsed.options);
-		const html = md.render(decrypted);
+		const html = renderDecryptedContent(decrypted);
 		return { type: 'success', html, password };
 	} catch {
 		return { type: 'error', msg: 'Decryption failed' };
@@ -833,6 +833,37 @@ function escapeHtml(str: string): string {
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#039;');
+}
+
+// ---------------------------------------------------------------------------
+// Plaintext rendering support
+// ---------------------------------------------------------------------------
+
+const PLAINTEXT_OPEN_RE = /^\s*```plaintext\s*[\r\n]/;
+const PLAINTEXT_CLOSE_RE = /\r?\n```\s*$/;
+
+function isPlaintextWrapped(content: string): boolean {
+	return PLAINTEXT_OPEN_RE.test(content);
+}
+
+function unwrapPlaintextContent(content: string): string {
+	let inner = content.replace(PLAINTEXT_OPEN_RE, '');
+	inner = inner.replace(PLAINTEXT_CLOSE_RE, '');
+	return inner;
+}
+
+function renderPlaintextHtml(plain: string): string {
+	const escaped = escapeHtml(plain);
+	// Use white-space:pre-wrap on the container so newlines are preserved
+	// without needing <br> tags. This is a simple div with escaped text.
+	return '<div class="plaintext-content">' + escaped + '</div>';
+}
+
+function renderDecryptedContent(content: string): string {
+	if (isPlaintextWrapped(content)) {
+		return renderPlaintextHtml(unwrapPlaintextContent(content));
+	}
+	return md.render(content);
 }
 
 async function showPasswordDialog(message: string, confirmPassword: boolean, errorMsg = ''): Promise<string | null> {

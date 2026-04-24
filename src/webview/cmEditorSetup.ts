@@ -95,8 +95,41 @@ const markdownHighlight = HighlightStyle.define([
 ]);
 
 // ---------------------------------------------------------------------------
-// Expose init function globally so the dialog HTML can call it
+// Shared extensions (non-markdown)
 // ---------------------------------------------------------------------------
+function baseExtensions(onUpdate?: (content: string) => void) {
+	return [
+		history(),
+		drawSelection(),
+		dropCursor(),
+		indentOnInput(),
+		highlightActiveLine(),
+		highlightSelectionMatches(),
+		joplinTheme,
+		noOutlineBase,
+		keymap.of([
+			...defaultKeymap,
+			...historyKeymap,
+			...foldKeymap,
+			...searchKeymap,
+			indentWithTab,
+		]),
+		EditorView.lineWrapping,
+		...(onUpdate
+			? [EditorView.updateListener.of((update) => {
+				if (update.docChanged && onUpdate) {
+					onUpdate(update.state.doc.toString());
+				}
+			})]
+			: []),
+	];
+}
+
+// ---------------------------------------------------------------------------
+// Expose init functions globally so the dialog HTML / runtime can call them
+// ---------------------------------------------------------------------------
+
+/** Full markdown-aware editor */
 (window as any).initCodeMirror = function initCodeMirror(
 	container: HTMLElement,
 	initialContent: string,
@@ -105,34 +138,29 @@ const markdownHighlight = HighlightStyle.define([
 	const state = EditorState.create({
 		doc: initialContent,
 		extensions: [
-			history(),
-			drawSelection(),
-			dropCursor(),
-			indentOnInput(),
+			...baseExtensions(onUpdate),
 			bracketMatching(),
-			highlightActiveLine(),
-			highlightSelectionMatches(),
-			joplinTheme,
-			noOutlineBase,
 			syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
 			syntaxHighlighting(markdownHighlight),
 			markdown(),
-			keymap.of([
-				...defaultKeymap,
-				...historyKeymap,
-				...foldKeymap,
-				...searchKeymap,
-				indentWithTab,
-			]),
-			EditorView.lineWrapping,
-			...(onUpdate
-				? [EditorView.updateListener.of((update) => {
-					if (update.docChanged && onUpdate) {
-						onUpdate(update.state.doc.toString());
-					}
-				})]
-				: []),
 		],
+	});
+
+	return new EditorView({
+		state,
+		parent: container,
+	});
+};
+
+/** Plain-text editor — no markdown syntax highlighting, no code styling */
+(window as any).initCodeMirrorPlain = function initCodeMirrorPlain(
+	container: HTMLElement,
+	initialContent: string,
+	onUpdate?: (content: string) => void,
+): EditorView {
+	const state = EditorState.create({
+		doc: initialContent,
+		extensions: baseExtensions(onUpdate),
 	});
 
 	return new EditorView({
