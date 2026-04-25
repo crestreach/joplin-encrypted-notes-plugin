@@ -116,14 +116,9 @@ function showEditorView(content) {
 	var container = document.getElementById('cm-editor-container');
 	if (editorView) editorView.style.display = 'block';
 
-	// Detect plaintext wrapper and strip it for editing
+	// Keep content as-is (including ```plaintext wrapper if present)
 	var rawContent = content || '';
-	var isPlain = /^\s*```plaintext\s*[\r\n]/.test(rawContent);
-	if (isPlain) {
-		rawContent = rawContent.replace(/^\s*```plaintext\s*[\r\n]/, '');
-		rawContent = rawContent.replace(/\r?\n```\s*$/, '');
-	}
-	_plaintextMode = isPlain;
+	_plaintextMode = /^\s*```plaintext\s*[\r\n]/.test(rawContent);
 	updatePlaintextUI();
 
 	if (container) {
@@ -134,22 +129,32 @@ function showEditorView(content) {
 }
 
 function initCmEditor(container, content) {
-	var initFn = _plaintextMode ? window.initCodeMirrorPlain : window.initCodeMirror;
+	// Always use markdown editor — content includes ```plaintext markers when in plaintext mode
+	var initFn = window.initCodeMirror;
 	if (typeof initFn === 'function') {
-		cmView = initFn(container, content);
+		cmView = initFn(container, content, onEditorContentChange);
 		cmView.focus();
 	} else {
 		var attempts = 0;
 		var poll = setInterval(function() {
-			initFn = _plaintextMode ? window.initCodeMirrorPlain : window.initCodeMirror;
+			initFn = window.initCodeMirror;
 			if (typeof initFn === 'function') {
 				clearInterval(poll);
-				cmView = initFn(container, content);
+				cmView = initFn(container, content, onEditorContentChange);
 				cmView.focus();
 			} else if (++attempts > 100) {
 				clearInterval(poll);
 			}
 		}, 50);
+	}
+}
+
+function onEditorContentChange(doc) {
+	// Sync _plaintextMode whenever the document text changes
+	var isPlain = /^\s*```plaintext\s*[\r\n]/.test(doc || '');
+	if (isPlain !== _plaintextMode) {
+		_plaintextMode = isPlain;
+		updatePlaintextUI();
 	}
 }
 
@@ -164,10 +169,7 @@ function hideEditorView() {
 async function saveFromEditor() {
 	if (!cmView) return;
 	var content = cmView.state.doc.toString();
-	// Re-wrap in ```plaintext fence if plaintext mode is active
-	if (_plaintextMode) {
-		content = '```plaintext\n' + content + '\n```';
-	}
+	// Content already includes ```plaintext wrapper if in plaintext mode — save as-is
 	var csId = readCsId();
 	if (!csId) return;
 
@@ -296,18 +298,36 @@ function updatePlaintextUI() {
 
 function togglePlaintextMode() {
 	if (!cmView) return;
-	// Grab current content from the editor
 	var content = cmView.state.doc.toString();
-	_plaintextMode = !_plaintextMode;
-	updatePlaintextUI();
-	// Recreate the CM editor with or without markdown extensions
-	var container = document.getElementById('cm-editor-container');
-	if (container) {
-		cmView.destroy();
-		cmView = null;
-		container.innerHTML = '';
-		initCmEditor(container, content);
+	var isCurrentlyPlain = /^\s*```plaintext\s*[\r\n]/.test(content);
+
+	if (isCurrentlyPlain) {
+		// Remove ```plaintext wrapper — use original document positions
+		var openMatch = content.match(/^(\s*```plaintext\s*\n)/);
+		var closeMatch = content.match(/(\r?\n```\s*)$/);
+		var changes = [];
+		if (openMatch) {
+			changes.push({ from: 0, to: openMatch[0].length, insert: '' });
+		}
+		if (closeMatch) {
+			changes.push({ from: content.length - closeMatch[0].length, to: content.length, insert: '' });
+		}
+		if (changes.length) {
+			cmView.dispatch({ changes: changes });
+		}
+	} else {
+		// Add ```plaintext wrapper
+		var len = cmView.state.doc.length;
+		cmView.dispatch({
+			changes: [
+				{ from: 0, to: 0, insert: '```plaintext\n' },
+				{ from: len, to: len, insert: '\n```' }
+			]
+		});
 	}
+
+	_plaintextMode = !isCurrentlyPlain;
+	updatePlaintextUI();
 }
 
 async function relock() {
