@@ -4,7 +4,7 @@
 	"app_min_version": "2.10",
 	"app_min_version_mobile": "3.0.3",
 	"platforms": ["desktop", "mobile"],
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"name": "Encrypted Notes",
 	"description": "Encrypt and decrypt notes with a password using AES-256-GCM. View and edit encrypted notes transparently while they remain encrypted on disk.",
 	"author": "Artur",

@@ -1,6 +1,6 @@
 {
 	"name": "joplin-plugin-encrypted-notes",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Encrypt and decrypt notes with a password using AES-256-GCM. View and edit encrypted notes transparently while they remain encrypted on disk.",
 	"keywords": [
 		"joplin-plugin",
